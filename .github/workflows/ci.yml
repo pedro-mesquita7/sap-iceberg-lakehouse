@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "30 6 * * *" # daily: proves the lakehouse still builds from scratch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint, test, run the pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --locked --python 3.12
+
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Unit tests (simulator + CDC extractor)
+        run: uv run pytest -q
+
+      - name: Run the pipeline end to end
+        # 30 days of SAP history, initial load, 5 daily delta runs, then dbt build with every test
+        run: uv run sap-lakehouse demo --history-days 30 --days 5
+
+      - name: Validate the Dagster code location
+        run: uv run dagster definitions validate -m sap_lakehouse.orchestration.definitions
+
+      - name: Build the dbt docs site
+        run: |
+          uv run sap-lakehouse docs
+          mkdir -p site
+          cp dbt/target/static_index.html site/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  docs:
+    name: Publish dbt docs
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

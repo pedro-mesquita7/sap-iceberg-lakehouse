@@ -1,0 +1,3 @@
+order_type_sap,order_type_code,order_type_name
+TA,OR,Standard Order
+SO,RO,Rush Order

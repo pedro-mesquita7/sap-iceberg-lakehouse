@@ -1,0 +1,138 @@
+version: 2
+
+models:
+  - name: stg_sap__currency_decimals
+    description: TCURX. Currencies whose amounts do not have 2 decimal places.
+    columns:
+      - name: currency_code
+        data_tests: [unique, not_null]
+
+  - name: stg_sap__customer_events
+    description: >
+      Every extracted KNA1 change, typed but not collapsed. The only model that reads the KNA1
+      source; both the current state and the SCD2 history are derived from it.
+    columns:
+      - name: _op
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [I, U, D]
+
+  - name: stg_sap__customers
+    description: Current customers (KNA1). Latest CDC event per key; deleted keys removed.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+
+  - name: stg_sap__materials
+    description: Current materials (MARA).
+    columns:
+      - name: material_id
+        data_tests: [unique, not_null]
+
+  - name: stg_sap__material_texts
+    description: Material descriptions per language (MAKT).
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [material_id, language_key]
+
+  - name: stg_sap__sales_orders
+    description: Current sales order headers (VBAK) with amounts shifted to their real currency decimals.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: net_value
+        data_tests: [not_null]
+
+  - name: stg_sap__sales_order_items
+    description: Current sales order items (VBAP).
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [order_id, item_number]
+    columns:
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sap__sales_orders')
+                field: order_id
+
+  - name: stg_sap__deliveries
+    description: Current delivery headers (LIKP). goods_issue_on is null until goods issue is posted.
+    columns:
+      - name: delivery_id
+        data_tests: [unique, not_null]
+
+  - name: stg_sap__delivery_items
+    description: Current delivery items (LIPS), referencing the sales order item they fulfil.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [delivery_id, item_number]
+
+  - name: stg_sap__billing_documents
+    description: Current billing headers (VBRK). Credit memos (G2) are negative.
+    columns:
+      - name: billing_id
+        data_tests: [unique, not_null]
+
+  - name: stg_sap__billing_items
+    description: Current billing items (VBRP), valued in the header currency.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [billing_id, item_number]
+    columns:
+      - name: currency_code
+        description: Taken from the header. Null here would mean an item arrived without its header.
+        data_tests: [not_null]
+
+unit_tests:
+  - name: sales_orders_resolve_cdc_and_sap_formats
+    description: >
+      Latest event per key wins, deleted orders drop out, ALPHA conversion only strips numeric keys,
+      '00000000' becomes null, JPY amounts are shifted by TCURX and trailing minus signs are parsed.
+    model: stg_sap__sales_orders
+    given:
+      - input: source('sap', 'vbak')
+        # SQL fixture: states every column type, so the test does not depend on bronze being loaded
+        format: sql
+        rows: |
+          select * from (values
+            ('100', '0010000001', '20260901', '081500', 'TA', '3000', '10', '00', '0000100001', '150.00',   'JPY', '00000000', 'A', 'I', 1, 'INIT'),
+            ('100', '0010000001', '20260901', '081500', 'TA', '3000', '10', '00', '0000100001', '175.00',   'JPY', '20260902', 'A', 'U', 5, 'DELTA'),
+            ('100', '0010000002', '20260901', '090000', 'TA', '1000', '10', '00', '0000100002', '10.00',    'EUR', '00000000', 'A', 'I', 2, 'INIT'),
+            ('100', '0010000002', null,       null,     null, null,   null, null, null,         null,       null,  null,       null, 'D', 6, 'DELTA'),
+            ('100', '0010000003', '20260902', '100000', 'SO', '1000', '10', '00', 'IC-PORTO',   '1250.50-', 'EUR', '00000000', 'C', 'I', 3, 'INIT')
+          ) as t(mandt, vbeln, erdat, erzet, auart, vkorg, vtweg, spart, kunnr, netwr, waerk, aedat, gbstk, _op, _seq, _load_type)
+          cross join (select
+            cast(null as timestamp) as _changed_at,
+            'unit-test' as _batch_id,
+            timestamptz '2026-09-02 12:00:00+00' as _extracted_at)
+      - input: ref('stg_sap__currency_decimals')
+        rows:
+          - {currency_code: JPY, currency_decimals: 0}
+          - {currency_code: KWD, currency_decimals: 3}
+    expect:
+      rows:
+        - {order_id: "10000001", customer_id: "100001", net_value: 17500.000, currency_code: JPY, created_on: 2026-09-01, last_changed_on: 2026-09-02}
+        - {order_id: "10000003", customer_id: "IC-PORTO", net_value: -1250.500, currency_code: EUR, created_on: 2026-09-02, last_changed_on: null}
+
+  - name: customer_history_builds_scd2_versions
+    description: A relocation creates a second version, a no-op re-delivery does not, and a delete closes the history.
+    model: dim_customer_history
+    given:
+      - input: ref('stg_sap__customer_events')
+        rows:
+          - {customer_id: "100001", customer_name: Atlantic Tools Lda., country_code: PT, city: Porto, _op: I, _seq: 10, changed_at: "2026-01-01 00:00:00"}
+          - {customer_id: "100001", customer_name: Atlantic Tools Lda., country_code: PT, city: Braga, _op: U, _seq: 20, changed_at: "2026-03-01 09:00:00"}
+          - {customer_id: "100001", customer_name: Atlantic Tools Lda., country_code: PT, city: Braga, _op: U, _seq: 30, changed_at: "2026-04-01 09:00:00"}
+          - {customer_id: "100002", customer_name: Alpine Supply GmbH, country_code: DE, city: Köln, _op: I, _seq: 10, changed_at: "2026-01-05 00:00:00"}
+          - {customer_id: "100002", _op: D, _seq: 40, changed_at: "2026-05-01 12:00:00"}
+    expect:
+      rows:
+        - {customer_id: "100001", city: Porto, valid_from: "2026-01-01 00:00:00", valid_to: "2026-03-01 09:00:00", is_current: false}
+        - {customer_id: "100001", city: Braga, valid_from: "2026-03-01 09:00:00", valid_to: null, is_current: true}
+        - {customer_id: "100002", city: Köln, valid_from: "2026-01-05 00:00:00", valid_to: "2026-05-01 12:00:00", is_current: false}

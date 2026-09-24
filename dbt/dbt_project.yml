@@ -1,0 +1,25 @@
+name: sap_lakehouse
+version: "1.0.0"
+profile: sap_lakehouse
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+target-path: target
+clean-targets: [target, dbt_packages]
+
+models:
+  sap_lakehouse:
+    staging:
+      +schema: silver
+      +materialized: view
+    marts:
+      +schema: gold
+      +materialized: table
+      +contract:
+        enforced: true
+
+seeds:
+  sap_lakehouse:
+    +schema: reference

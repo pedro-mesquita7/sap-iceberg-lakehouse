@@ -1,0 +1,3 @@
+billing_type,billing_type_name,is_credit_memo
+F2,Invoice,false
+G2,Credit Memo,true

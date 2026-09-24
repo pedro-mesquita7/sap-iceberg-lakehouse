@@ -1,0 +1,40 @@
+version: 2
+
+sources:
+  - name: sap
+    description: >
+      Bronze layer. CDC events landed in Apache Iceberg by the ODP extractor, read through the
+      dbt-duckdb iceberg plugin. One row per extracted change: SAP fields are raw strings exactly
+      as SAP delivers them, `_op` / `_seq` / `_changed_at` describe the change.
+    schema: bronze
+    tables:
+      - name: tcurx
+        description: Currency decimal places, only for currencies that deviate from 2 (TCURX)
+        config: {meta: {plugin: iceberg}}
+      - name: kna1
+        description: Customer master, general data (KNA1)
+        config: {meta: {plugin: iceberg}}
+      - name: mara
+        description: Material master, general data (MARA)
+        config: {meta: {plugin: iceberg}}
+      - name: makt
+        description: Material descriptions, one row per language (MAKT)
+        config: {meta: {plugin: iceberg}}
+      - name: vbak
+        description: Sales document header (VBAK)
+        config: {meta: {plugin: iceberg}}
+      - name: vbap
+        description: Sales document item (VBAP)
+        config: {meta: {plugin: iceberg}}
+      - name: likp
+        description: Delivery header (LIKP)
+        config: {meta: {plugin: iceberg}}
+      - name: lips
+        description: Delivery item (LIPS)
+        config: {meta: {plugin: iceberg}}
+      - name: vbrk
+        description: Billing document header (VBRK)
+        config: {meta: {plugin: iceberg}}
+      - name: vbrp
+        description: Billing document item (VBRP)
+        config: {meta: {plugin: iceberg}}

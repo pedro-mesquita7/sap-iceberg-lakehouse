@@ -1,0 +1,4 @@
+sap_unit,unit_code,iso_code,unit_name
+ST,PC,PCE,Piece
+KAR,CAR,CT,Carton
+KG,KG,KGM,Kilogram

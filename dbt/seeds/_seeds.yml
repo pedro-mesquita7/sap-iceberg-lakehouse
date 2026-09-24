@@ -1,0 +1,31 @@
+version: 2
+
+seeds:
+  - name: sap_units
+    description: SAP internal units of measure (German keys) mapped to commercial and ISO codes, like table T006A.
+    config:
+      column_types: {sap_unit: varchar, unit_code: varchar, iso_code: varchar, unit_name: varchar}
+  - name: sap_order_types
+    description: Sales document types. SAP stores the German key (TA) and shows the English one (OR).
+    config:
+      column_types: {order_type_sap: varchar, order_type_code: varchar, order_type_name: varchar}
+  - name: sap_billing_types
+    description: Billing document types (TVFK).
+    config:
+      column_types: {billing_type: varchar, billing_type_name: varchar, is_credit_memo: boolean}
+  - name: sap_rejection_reasons
+    description: Reasons for rejecting a sales order item (TVAG).
+    config:
+      column_types: {rejection_reason_code: varchar, rejection_reason: varchar}
+  - name: sap_languages
+    description: One-character SAP language keys (SPRAS) mapped to ISO codes.
+    config:
+      column_types: {language_key: varchar, language_iso: varchar, language_name: varchar}
+  - name: sap_sales_orgs
+    description: Sales organizations.
+    config:
+      column_types: {sales_org: varchar, sales_org_name: varchar}
+  - name: fx_rates_to_eur
+    description: Static EUR conversion rates. A production build would load daily rates (TCURR) instead.
+    config:
+      column_types: {currency_code: varchar, eur_per_unit: "decimal(18, 6)"}

@@ -1,0 +1,4 @@
+rejection_reason_code,rejection_reason
+01,Delivery date too late
+03,Too expensive
+04,Competitor better

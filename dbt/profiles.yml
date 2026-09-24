@@ -1,0 +1,16 @@
+# SAP_LAKEHOUSE_HOME is set by the `sap-lakehouse` CLI and the Dagster code location.
+# Bronze tables are read straight from the Iceberg catalog through dbt-duckdb's iceberg plugin.
+sap_lakehouse:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('SAP_LAKEHOUSE_HOME') }}/analytics.duckdb"
+      threads: 4
+      plugins:
+        - module: iceberg
+          config:
+            catalog: lakehouse
+            type: sql
+            uri: "sqlite:///{{ env_var('SAP_LAKEHOUSE_HOME') }}/iceberg_catalog.db"
+            py-io-impl: pyiceberg.io.fsspec.FsspecFileIO

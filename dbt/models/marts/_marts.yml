@@ -1,0 +1,267 @@
+version: 2
+
+models:
+  - name: dim_customer
+    description: Current state of every customer (KNA1), keys ALPHA-converted.
+    columns:
+      - name: customer_id
+        data_type: varchar
+        description: Customer number without leading zeros. External numbers (IC-*) are kept as-is.
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: customer_name
+        data_type: varchar
+      - name: country_code
+        data_type: varchar
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [PT, ES, DE, FR, GB, US, JP, KW]
+      - name: city
+        data_type: varchar
+      - name: account_group
+        data_type: varchar
+      - name: is_intercompany
+        data_type: boolean
+      - name: created_on
+        data_type: date
+      - name: is_marked_for_deletion
+        data_type: boolean
+
+  - name: dim_customer_history
+    description: >
+      SCD Type 2 history of customers, derived from the CDC event log. One row per version;
+      valid_to is null for the current version.
+    columns:
+      - name: customer_version_key
+        data_type: varchar
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: customer_id
+        data_type: varchar
+        constraints: [{type: not_null}]
+      - name: customer_name
+        data_type: varchar
+      - name: country_code
+        data_type: varchar
+      - name: city
+        data_type: varchar
+      - name: valid_from
+        data_type: timestamp
+        constraints: [{type: not_null}]
+      - name: valid_to
+        data_type: timestamp
+      - name: is_current
+        data_type: boolean
+
+  - name: dim_material
+    description: Materials (MARA) with descriptions pivoted from MAKT and units translated to English/ISO.
+    columns:
+      - name: material_id
+        data_type: varchar
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: material_name
+        data_type: varchar
+        description: English description, falling back to German, then Portuguese.
+        constraints: [{type: not_null}]
+      - name: description_de
+        data_type: varchar
+      - name: description_pt
+        data_type: varchar
+      - name: material_type
+        data_type: varchar
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [FERT, HAWA]
+      - name: material_group
+        data_type: varchar
+      - name: base_unit
+        data_type: varchar
+        description: Commercial unit in English (SAP stores ST, users see PC).
+        data_tests: [not_null]
+      - name: base_unit_iso
+        data_type: varchar
+      - name: gross_weight_kg
+        data_type: decimal(18, 3)
+      - name: created_on
+        data_type: date
+      - name: last_changed_on
+        data_type: date
+
+  - name: fct_sales_order_items
+    description: One row per sales order item (VBAP joined to VBAK), amounts in document currency and EUR.
+    columns:
+      - name: order_item_key
+        data_type: varchar
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: order_id
+        data_type: varchar
+        constraints: [{type: not_null}]
+      - name: item_number
+        data_type: integer
+        constraints: [{type: not_null}]
+      - name: order_date
+        data_type: date
+        constraints: [{type: not_null}]
+      - name: customer_id
+        data_type: varchar
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_id
+      - name: material_id
+        data_type: varchar
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_material')
+                field: material_id
+      - name: order_type
+        data_type: varchar
+        data_tests: [not_null]
+      - name: sales_org
+        data_type: varchar
+      - name: order_quantity
+        data_type: decimal(18, 3)
+      - name: sales_unit
+        data_type: varchar
+      - name: net_value
+        data_type: decimal(18, 3)
+      - name: currency_code
+        data_type: varchar
+      - name: net_value_eur
+        data_type: decimal(18, 2)
+        data_tests: [not_null]
+      - name: is_rejected
+        data_type: boolean
+      - name: rejection_reason
+        data_type: varchar
+      - name: overall_status
+        data_type: varchar
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [A, B, C]
+
+  - name: fct_billing_items
+    description: One row per billing document item (VBRP joined to VBRK). Credit memos carry negative values.
+    columns:
+      - name: billing_item_key
+        data_type: varchar
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: billing_id
+        data_type: varchar
+        constraints: [{type: not_null}]
+      - name: item_number
+        data_type: integer
+      - name: billing_type
+        data_type: varchar
+      - name: billing_type_name
+        data_type: varchar
+        data_tests: [not_null]
+      - name: is_credit_memo
+        data_type: boolean
+      - name: billing_date
+        data_type: date
+        constraints: [{type: not_null}]
+      - name: customer_id
+        data_type: varchar
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_id
+      - name: material_id
+        data_type: varchar
+      - name: order_id
+        data_type: varchar
+      - name: order_item_number
+        data_type: integer
+      - name: sales_org
+        data_type: varchar
+      - name: reference_document_id
+        data_type: varchar
+        description: Delivery for invoices, original invoice for credit memos.
+      - name: billed_quantity
+        data_type: decimal(18, 3)
+      - name: net_value
+        data_type: decimal(18, 3)
+      - name: currency_code
+        data_type: varchar
+      - name: net_value_eur
+        data_type: decimal(18, 2)
+        data_tests: [not_null]
+
+  - name: fct_order_fulfillment
+    description: Order-to-Cash cycle per order item, with the lead time of each step in days.
+    columns:
+      - name: order_item_key
+        data_type: varchar
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: order_id
+        data_type: varchar
+      - name: item_number
+        data_type: integer
+      - name: customer_id
+        data_type: varchar
+      - name: material_id
+        data_type: varchar
+      - name: sales_org
+        data_type: varchar
+      - name: order_date
+        data_type: date
+      - name: delivery_id
+        data_type: varchar
+      - name: delivery_created_on
+        data_type: date
+      - name: goods_issue_on
+        data_type: date
+      - name: invoiced_on
+        data_type: date
+      - name: days_order_to_goods_issue
+        data_type: integer
+      - name: days_goods_issue_to_invoice
+        data_type: integer
+      - name: days_order_to_invoice
+        data_type: integer
+      - name: fulfillment_status
+        data_type: varchar
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [open, in_delivery, shipped, invoiced, rejected]
+      - name: net_value_eur
+        data_type: decimal(18, 2)
+
+  - name: agg_daily_sales
+    description: Daily bookings, invoicing and credits per sales organization, in EUR.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [sales_date, sales_org]
+    columns:
+      - name: sales_date
+        data_type: date
+        constraints: [{type: not_null}]
+      - name: sales_org
+        data_type: varchar
+        constraints: [{type: not_null}]
+      - name: sales_org_name
+        data_type: varchar
+      - name: orders_booked
+        data_type: integer
+      - name: booked_eur
+        data_type: decimal(18, 2)
+      - name: invoiced_eur
+        data_type: decimal(18, 2)
+      - name: credited_eur
+        data_type: decimal(18, 2)
+      - name: net_revenue_eur
+        data_type: decimal(18, 2)
