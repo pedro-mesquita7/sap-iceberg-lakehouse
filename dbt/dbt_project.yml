@@ -9,6 +9,11 @@ test-paths: ["tests"]
 target-path: target
 clean-targets: [target, dbt_packages]
 
+# The iceberg plugin loads each bronze source into this schema. Creating it up front avoids
+# parallel threads racing to create it on a fresh database (DuckDB write-write conflict).
+on-run-start:
+  - "create schema if not exists bronze"
+
 models:
   sap_lakehouse:
     staging:

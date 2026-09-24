@@ -105,7 +105,7 @@ unit_tests:
             ('100', '0010000001', '20260901', '081500', 'TA', '3000', '10', '00', '0000100001', '175.00',   'JPY', '20260902', 'A', 'U', 5, 'DELTA'),
             ('100', '0010000002', '20260901', '090000', 'TA', '1000', '10', '00', '0000100002', '10.00',    'EUR', '00000000', 'A', 'I', 2, 'INIT'),
             ('100', '0010000002', null,       null,     null, null,   null, null, null,         null,       null,  null,       null, 'D', 6, 'DELTA'),
-            ('100', '0010000003', '20260902', '100000', 'SO', '1000', '10', '00', 'IC-PORTO',   '1250.50-', 'EUR', '00000000', 'C', 'I', 3, 'INIT')
+            ('100', '0010000003', '20260902', '100000', 'SO', '1000', '10', '00', 'IC-NORTH',   '1250.50-', 'EUR', '00000000', 'C', 'I', 3, 'INIT')
           ) as t(mandt, vbeln, erdat, erzet, auart, vkorg, vtweg, spart, kunnr, netwr, waerk, aedat, gbstk, _op, _seq, _load_type)
           cross join (select
             cast(null as timestamp) as _changed_at,
@@ -118,7 +118,7 @@ unit_tests:
     expect:
       rows:
         - {order_id: "10000001", customer_id: "100001", net_value: 17500.000, currency_code: JPY, created_on: 2026-09-01, last_changed_on: 2026-09-02}
-        - {order_id: "10000003", customer_id: "IC-PORTO", net_value: -1250.500, currency_code: EUR, created_on: 2026-09-02, last_changed_on: null}
+        - {order_id: "10000003", customer_id: "IC-NORTH", net_value: -1250.500, currency_code: EUR, created_on: 2026-09-02, last_changed_on: null}
 
   - name: customer_history_builds_scd2_versions
     description: A relocation creates a second version, a no-op re-delivery does not, and a delete closes the history.

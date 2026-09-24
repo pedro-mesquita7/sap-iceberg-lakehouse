@@ -17,7 +17,9 @@
 
 Getting data out of SAP is where most enterprise data platforms get messy. The tables are cryptic (`VBAK`, `VBAP`, `LIKP`), the data arrives in SAP's internal formats, and full reloads stop scaling after the first year. Change data capture is the answer, but it only works if deletes, re-runs and partial failures are handled properly.
 
-This repository is a working reference implementation of that pipeline. It is built from patterns I use on real SAP extractions, on public tools, with a simulated SAP system so anyone can run it:
+This repository is a working reference implementation of that pipeline, with a simulated SAP system so anyone can run it. It was written from scratch on public tools and synthetic data: it contains no code, data or configuration from any employer or client.
+
+How it fits together:
 
 1. **A simulated SAP SD system** creates, changes, rejects, deletes, delivers and bills sales orders every business day. Every change is logged to an ODP-style delta queue.
 2. **A CDC extractor** reads the delta queue and appends change events to **Apache Iceberg** tables. The extraction watermark is committed atomically in the same Iceberg snapshot as the data.
@@ -80,7 +82,7 @@ SAP delivers data in its internal formats. Each quirk below is handled in a test
 
 | Quirk | Raw value | After silver |
 |---|---|---|
-| ALPHA conversion: numeric keys are zero-padded, external keys are not | `0000100042`, `IC-PORTO` | `100042`, `IC-PORTO` |
+| ALPHA conversion: numeric keys are zero-padded, external keys are not | `0000100042`, `IC-NORTH` | `100042`, `IC-NORTH` |
 | "No date" is `00000000` | `00000000` | `null` |
 | Amounts are stored with 2 decimals whatever the currency (TCURX lists the exceptions) | JPY `150.00`, KWD `229207.60` | JPY `15000`, KWD `22920.760` |
 | Negative numbers carry a trailing minus sign | `1250.50-` | `-1250.50` |

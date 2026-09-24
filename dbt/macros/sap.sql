@@ -19,7 +19,7 @@
 
 
 {# ALPHA conversion (output): strip leading zeros from purely numeric keys only.
-   '0000100042' -> '100042', but external keys like 'IC-PORTO' stay untouched. #}
+   '0000100042' -> '100042', but external keys like 'IC-NORTH' stay untouched. #}
 {% macro sap_alpha_out(column) %}
     case
         when regexp_full_match({{ column }}, '[0-9]+')

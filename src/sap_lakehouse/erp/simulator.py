@@ -355,8 +355,8 @@ class ErpSimulator:
             self._new_customer(con, rng, start - timedelta(days=rng.randint(60, 2000)))
         # Intercompany customers have external numbers - ALPHA conversion must skip them
         for kunnr, name, land, city in [
-            ("IC-PORTO", "Group Plant Porto", "PT", "Porto"),
-            ("IC-STUTT", "Group Plant Stuttgart", "DE", "Stuttgart"),
+            ("IC-NORTH", "Group Company North", "PT", "Braga"),
+            ("IC-SOUTH", "Group Company South", "ES", "Madrid"),
         ]:
             self._insert(
                 con,
